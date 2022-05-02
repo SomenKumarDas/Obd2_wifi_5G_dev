@@ -48,21 +48,16 @@ void app_srv_task(void *args)
                     UART_COM.write(RxBuff, TcpRxLen);
                 }
 
-                if ((UartRxLen = UART_COM.available()) > 0)
+                while(UART_COM.available())
                 {
-                    for(uint16_t idx = 0; idx < UartRxLen; idx++)
-                    {
-                        TxBuff[idx] = UART_COM.read();
-                    }
-
-                    if(wClient.write(TxBuff, UartRxLen) <= 0)
+                    if(wClient.write(UART_COM.read()) <= 0)
                     {
                         UART_LOG.print("[D] [break by write");
                         break;
                     }
                 }
 
-                vTaskDelay(pdMS_TO_TICKS(100));
+                vTaskDelay(pdMS_TO_TICKS(10));
             }
             UART_LOG.println("[INFO] [Client Disconnected]");
             wClient.stop();
@@ -70,7 +65,7 @@ void app_srv_task(void *args)
             digitalWrite(LED_B, HIGH);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
 exit:
