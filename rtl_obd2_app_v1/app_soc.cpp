@@ -1,20 +1,12 @@
 #include "app_soc.hpp"
 
 /* Application OS TASK Global Vars */
-
-TaskHandle_t AppSoc_TH;
-SemaphoreHandle_t WIFI_TCPSocComplete_Sem;
-
-/* App Local Vars */
-
-WiFiClient wClient;
-WiFiServer SocSrv(6889);
-static wl_status_t status = WL_IDLE_STATUS;
-uint8_t RxBuff[APP_PAYLOAD_MAX_LEN], TxBuff[APP_PAYLOAD_MAX_LEN];
-int TcpRxLen = 0, UartRxLen = 0;
+TaskHandle_t AppSoc_TH, SocTx_TH;
+SemaphoreHandle_t SocComplete_Sem;
 
 /* Local Functions Protoypes */
 static bool wifi_init(void);
+static void socTx_subTask(void *args);
 
 /****************************
  * Global Function Definitions
@@ -28,8 +20,12 @@ static bool wifi_init(void);
  */
 void app_srv_task(void *args)
 {
-    STATUS_FN(wifi_init(), goto exit;)
+    WiFiClient wClient;
+    WiFiServer SocSrv(6889);
+    uint8_t RxBuff[APP_PAYLOAD_MAX_LEN];
+    int SocRxLen = 0;
 
+    STATUS_FN(wifi_init(), goto exit;)
     SocSrv.begin();
 
     for (;;)
@@ -37,44 +33,82 @@ void app_srv_task(void *args)
         wClient = SocSrv.available();
         if (wClient.connected() == true)
         {
-            UART_LOG.println("[INFO] [New client Connected]");
+            log_i("[New client Connected]");
             digitalWrite(LED_B, LOW);
             digitalWrite(LED_G, HIGH);
+            xTaskCreate(socTx_subTask, "socTx_subTask", 1024 * 5, (void*)&wClient, 2, &SocTx_TH);
             while (wClient.connected())
             {
-                if ((TcpRxLen = wClient.read(RxBuff, 4100)) > 0)
+                if ((SocRxLen = wClient.read(RxBuff, sizeof(RxBuff))) > 0)
                 {
-                    UART_LOG.print("[D] [TcpRxLen: "); UART_LOG.println(TcpRxLen);
-                    UART_COM.write(RxBuff, TcpRxLen);
+                    UART_COM.write(RxBuff, SocRxLen);
+                    log_d("[SocRxLen: %d]", SocRxLen);
                 }
 
-                while(UART_COM.available())
-                {
-                    if(wClient.write(UART_COM.read()) <= 0)
-                    {
-                        UART_LOG.print("[D] [break by write");
-                        break;
-                    }
-                }
-
-                vTaskDelay(pdMS_TO_TICKS(10));
+                sleep(500);
             }
-            UART_LOG.println("[INFO] [Client Disconnected]");
+            log_i("[Client Disconnected]");
+            vTaskDelete(SocTx_TH);
             wClient.stop();
             digitalWrite(LED_G, LOW);
             digitalWrite(LED_B, HIGH);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        sleep(1000);
     }
 
 exit:
-    UART_LOG.println("[ERROR] [TASK EXIT]");
+    log_e("[APP] [TASK EXIT]");
+    vTaskDelete(NULL);
+}
+
+static void socTx_subTask(void *args)
+{
+    log_i("[socTx_subTask start]");
+    uint8_t TxBuff[APP_PAYLOAD_MAX_LEN];
+    WiFiClient * SocCl = static_cast<WiFiClient*>(args);
+    int comRxLen = 0, SocTxLen = 0;
+    uint8_t *dPtr = NULL;
+    for (;;)
+    {
+
+        if ((comRxLen = UART_COM.available()) > 0)
+        {
+            dPtr = &TxBuff[0];
+            SocTxLen = 0;
+            while (comRxLen != UART_COM.available())
+            {
+                sleep(100);
+                comRxLen = UART_COM.available();
+            }
+
+            while (comRxLen--)
+            {
+                *dPtr++ = UART_COM.read();
+                SocTxLen++;
+            }
+
+            if (SocCl->write(&TxBuff[0], SocTxLen))
+            {
+                log_d("[SocTxLen: %d]", SocTxLen);
+            }
+        }
+        // while (UART_COM.available())
+        // {
+        //     wClient.write(UART_COM.read());
+        // }
+
+        sleep(500);
+    }
+    log_w("[APP] [socTx_subTask stop]");
+    SocCl->stop();
     vTaskDelete(NULL);
 }
 
 static bool wifi_init(void)
 {
+    static wl_status_t status = WL_IDLE_STATUS;
+
     if (WiFi.status() == WL_NO_SHIELD)
     {
         UART_LOG.println("[ERROR] [WL_NO_SHIELD]");
