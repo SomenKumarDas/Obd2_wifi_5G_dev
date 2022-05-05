@@ -45,7 +45,7 @@ void app_srv_task(void *args)
                     log_d("[SocRxLen: %d]", SocRxLen);
                 }
 
-                sleep(500);
+                sleep(5);
             }
             log_i("[Client Disconnected]");
             vTaskDelete(SocTx_TH);
@@ -54,7 +54,7 @@ void app_srv_task(void *args)
             digitalWrite(LED_B, HIGH);
         }
 
-        sleep(1000);
+        sleep(100);
     }
 
 exit:
@@ -98,7 +98,7 @@ static void socTx_subTask(void *args)
         //     wClient.write(UART_COM.read());
         // }
 
-        sleep(500);
+        sleep(10);
     }
     log_w("[APP] [socTx_subTask stop]");
     SocCl->stop();
@@ -108,6 +108,7 @@ static void socTx_subTask(void *args)
 static bool wifi_init(void)
 {
     static wl_status_t status = WL_IDLE_STATUS;
+    MDNSService service("obd5gz", "_tcp", "local", 80);
 
     if (WiFi.status() == WL_NO_SHIELD)
     {
@@ -128,6 +129,9 @@ static bool wifi_init(void)
         digitalWrite(LED_B, HIGH);
         return true;
     }
+
+    MDNS.begin();
+    MDNS.registerService(service);
 
     return false;
 }

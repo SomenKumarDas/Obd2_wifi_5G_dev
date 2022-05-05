@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "AmebaMDNS.h"
 #include "WiFi.h"
 #include "dev_log.hpp"
 
