@@ -108,7 +108,7 @@ static void socTx_subTask(void *args)
 static bool wifi_init(void)
 {
     static wl_status_t status = WL_IDLE_STATUS;
-    MDNSService service("obd5gz", "_tcp", "local", 80);
+    MDNSService service("can2x5g", "_tcp", "local", 80);
 
     if (WiFi.status() == WL_NO_SHIELD)
     {
