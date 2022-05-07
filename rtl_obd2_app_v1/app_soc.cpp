@@ -36,16 +36,22 @@ void app_srv_task(void *args)
             log_i("[New client Connected]");
             digitalWrite(LED_B, LOW);
             digitalWrite(LED_G, HIGH);
-            xTaskCreate(socTx_subTask, "socTx_subTask", 1024 * 5, (void*)&wClient, 2, &SocTx_TH);
+            xTaskCreate(socTx_subTask, "socTx_subTask", 1024 * 5, (void *)&wClient, 2, &SocTx_TH);
             while (wClient.connected())
             {
                 if ((SocRxLen = wClient.read(RxBuff, sizeof(RxBuff))) > 0)
                 {
-                    UART_COM.write(RxBuff, SocRxLen);
+                    int chunk, SerTxLen = 0;
                     log_d("[SocRxLen: %d]", SocRxLen);
+                    do
+                    {
+                        chunk = ((SocRxLen - SerTxLen) > 450) ? 450 : (SocRxLen - SerTxLen);
+                        SerTxLen += UART_COM.write(RxBuff, chunk);
+                        sleep(8);
+                    } while (SerTxLen < SocRxLen);
                 }
 
-                sleep(5);
+                sleep(10);
             }
             log_i("[Client Disconnected]");
             vTaskDelete(SocTx_TH);
@@ -66,7 +72,7 @@ static void socTx_subTask(void *args)
 {
     log_i("[socTx_subTask start]");
     uint8_t TxBuff[APP_PAYLOAD_MAX_LEN];
-    WiFiClient * SocCl = static_cast<WiFiClient*>(args);
+    WiFiClient *SocCl = static_cast<WiFiClient *>(args);
     int comRxLen = 0, SocTxLen = 0;
     uint8_t *dPtr = NULL;
     for (;;)
@@ -108,7 +114,7 @@ static void socTx_subTask(void *args)
 static bool wifi_init(void)
 {
     static wl_status_t status = WL_IDLE_STATUS;
-    MDNSService service("can2x5g", "_tcp", "local", 80);
+    // MDNSService service("can2x5g", "_tcp", "local", 80);
 
     if (WiFi.status() == WL_NO_SHIELD)
     {
@@ -130,8 +136,8 @@ static bool wifi_init(void)
         return true;
     }
 
-    MDNS.begin();
-    MDNS.registerService(service);
+    // MDNS.begin();
+    // MDNS.registerService(service);
 
     return false;
 }
