@@ -42,13 +42,19 @@ void app_srv_task(void *args)
                 if ((SocRxLen = wClient.read(RxBuff, sizeof(RxBuff))) > 0)
                 {
                     int chunk, SerTxLen = 0;
-                    log_d("[SocRxLen: %d]", SocRxLen);
                     do
                     {
                         chunk = ((SocRxLen - SerTxLen) > 450) ? 450 : (SocRxLen - SerTxLen);
-                        SerTxLen += UART_COM.write(RxBuff, chunk);
+                        SerTxLen += UART_COM.write(&RxBuff[SerTxLen], chunk);
                         sleep(8);
                     } while (SerTxLen < SocRxLen);
+
+                    printf("[APP] [%d] [", SocRxLen);
+                    for (int i = 0; i < ((SocRxLen > 10) ? 10 : (SocRxLen)); i++)
+                    {
+                        printf("%02x", RxBuff[i]);
+                    }
+                    printf("]\r\n");
                 }
 
                 sleep(10);
@@ -96,14 +102,14 @@ static void socTx_subTask(void *args)
 
             if (SocCl->write(&TxBuff[0], SocTxLen))
             {
-                log_d("[SocTxLen: %d]", SocTxLen);
+                printf("[DGL] [%d] [", SocTxLen);
+                for (int i = 0; i < ((SocTxLen > 10) ? 10 : (SocTxLen)); i++)
+                {
+                    printf("%02x", TxBuff[i]);
+                }
+                printf("]\r\n");
             }
         }
-        // while (UART_COM.available())
-        // {
-        //     wClient.write(UART_COM.read());
-        // }
-
         sleep(10);
     }
     log_w("[APP] [socTx_subTask stop]");
